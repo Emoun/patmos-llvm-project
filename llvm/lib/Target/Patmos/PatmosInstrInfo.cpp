@@ -34,7 +34,7 @@ using namespace llvm;
 #include "PatmosGenInstrInfo.inc"
 #include "PatmosGenDFAPacketizer.inc"
 
-PatmosInstrInfo::PatmosInstrInfo(PatmosTargetMachine &tm)
+PatmosInstrInfo::PatmosInstrInfo(const PatmosTargetMachine &tm)
   : PatmosGenInstrInfo(Patmos::ADJCALLSTACKDOWN, Patmos::ADJCALLSTACKUP),
     PTM(tm), RI(tm, *this), PST(*tm.getSubtargetImpl()) {}
 
@@ -63,8 +63,8 @@ bool PatmosInstrInfo::findCommutedOpIndices(const MachineInstr &MI,
 }
 
 void PatmosInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
-                                  MachineBasicBlock::iterator I, DebugLoc DL,
-                                  unsigned DestReg, unsigned SrcReg,
+                                  MachineBasicBlock::iterator I, const DebugLoc &DL,
+                                  MCRegister DestReg, MCRegister SrcReg,
                                   bool KillSrc) const {
   unsigned Opc;
   if (Patmos::RRegsRegClass.contains(DestReg, SrcReg)) {
@@ -97,7 +97,7 @@ void PatmosInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
 
 void PatmosInstrInfo::
 storeRegToStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
-                    unsigned SrcReg, bool isKill, int FrameIdx,
+                    Register SrcReg, bool isKill, int FrameIdx,
                     const TargetRegisterClass *RC,
                     const TargetRegisterInfo *TRI) const
 {
@@ -142,7 +142,7 @@ storeRegToStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
 
 void PatmosInstrInfo::
 loadRegFromStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
-                     unsigned DestReg, int FrameIdx,
+                     Register DestReg, int FrameIdx,
                      const TargetRegisterClass *RC,
                      const TargetRegisterInfo *TRI) const
 {
@@ -155,55 +155,48 @@ loadRegFromStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
   DebugLoc DL;
   if (MI != MBB.end()) DL = MI->getDebugLoc();
 
-  MachineFunction &MF = *MBB.getParent();
-  MachineFrameInfo &MFI = MF.getFrameInfo();
-  MachineMemOperand *MMO =
-  MF.getMachineMemOperand(MachinePointerInfo::getFixedStack(MF, FrameIdx),
-                          MachineMemOperand::MOLoad,
-                          MFI.getObjectSize(FrameIdx),
-                          MFI.getObjectAlign(FrameIdx));
-
   if (RC == &Patmos::RRegsRegClass) {
     AddDefaultPred(BuildMI(MBB, MI, DL, get(Patmos::LWC), DestReg))
-      .addFrameIndex(FrameIdx).addImm(0) // address
-      .addMemOperand(MMO);
+      .addFrameIndex(FrameIdx).addImm(0); // address
   }
   else if (RC == &Patmos::PRegsRegClass) {
     // Clients assume the last instruction inserted to be a load instruction.
     // Again, we work around this with a pseudo instruction that is expanded
     // during FrameIndex elimination.
     BuildMI(MBB, MI, DL, get(Patmos::PSEUDO_PREG_RELOAD), DestReg)
-      .addFrameIndex(FrameIdx).addImm(0) // address
-      .addMemOperand(MMO);
+      .addFrameIndex(FrameIdx).addImm(0); // address
   }
-  else llvm_unreachable("Register class not handled!");
+  else {
+    errs() << "Register: " << DestReg << "\n";
+    llvm_unreachable("Register class not handled!");
+  }
 }
 
-unsigned PatmosInstrInfo::isStoreToStackSlot(const MachineInstr *MI,
+unsigned PatmosInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
                                              int &FrameIndex) const {
   // stack stores still go through cache at this point
-  if (MI->getOpcode() == Patmos::SWC ||
-      MI->getOpcode() == Patmos::SHC ||
-      MI->getOpcode() == Patmos::SBC) {
-    if (MI->getOperand(2).isFI() && MI->getOperand(3).isImm() &&
-        MI->getOperand(3).getImm() == 0) {
-      FrameIndex = MI->getOperand(2).getIndex();
-      return MI->getOperand(4).getReg();
+  if (MI.getOpcode() == Patmos::SWC ||
+      MI.getOpcode() == Patmos::SHC ||
+      MI.getOpcode() == Patmos::SBC) {
+    if (MI.getOperand(2).isFI() && MI.getOperand(3).isImm() &&
+        MI.getOperand(3).getImm() == 0) {
+      FrameIndex = MI.getOperand(2).getIndex();
+      return MI.getOperand(4).getReg();
     }
   }
   return 0;
 }
 
-unsigned PatmosInstrInfo::isLoadFromStackSlot(const MachineInstr *MI,
+unsigned PatmosInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
                                               int &FrameIndex) const {
   // stack loads still go through cache at this point
-  if (MI->getOpcode() == Patmos::LWC ||
-      MI->getOpcode() == Patmos::LHC || MI->getOpcode() == Patmos::LHUC ||
-      MI->getOpcode() == Patmos::LBC || MI->getOpcode() == Patmos::LBUC) {
-    if (MI->getOperand(3).isFI() && MI->getOperand(4).isImm() &&
-        MI->getOperand(4).getImm() == 0) {
-      FrameIndex = MI->getOperand(3).getIndex();
-      return MI->getOperand(0).getReg();
+  if (MI.getOpcode() == Patmos::LWC ||
+      MI.getOpcode() == Patmos::LHC || MI.getOpcode() == Patmos::LHUC ||
+      MI.getOpcode() == Patmos::LBC || MI.getOpcode() == Patmos::LBUC) {
+    if (MI.getOperand(3).isFI() && MI.getOperand(4).isImm() &&
+        MI.getOperand(4).getImm() == 0) {
+      FrameIndex = MI.getOperand(3).getIndex();
+      return MI.getOperand(0).getReg();
     }
   }
   return 0;
