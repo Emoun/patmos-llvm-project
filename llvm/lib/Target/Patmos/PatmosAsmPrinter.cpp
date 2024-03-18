@@ -103,7 +103,7 @@ void PatmosAsmPrinter::emitBasicBlockStart(const MachineBasicBlock &MBB) {
 
   // We always emit a label for each block using the below format
   // because 'Platin' needs it in the object file when doing WCET analysis.
-  auto platin_label_string = string_format(".LBB%d_%d", MBB.getParent()->getFunctionNumber(), MBB.getNumber());
+  auto platin_label_string = string_format("LBB%d_%d", MBB.getParent()->getFunctionNumber(), MBB.getNumber());
   auto *platin_label = OutContext.getOrCreateSymbol(platin_label_string);
 
   if(platin_label->isUndefined()){

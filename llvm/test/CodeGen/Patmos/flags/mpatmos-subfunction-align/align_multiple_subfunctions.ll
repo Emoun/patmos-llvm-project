@@ -32,7 +32,7 @@ entry:
 ; CHECK: .fstart	[[INLINE1:.LBB0_[0-9]]], .PPGtmp{{[0-9]}}-[[INLINE1]], 32
 ; CHECK-LABEL: .inline_1:
 
-; ALIGN: {{[0-9]*[0|2|4|6|8|a|c|e]4}} <.inline_1>:
+; ALIGN: {{[0-9]*[0|2|4|6|8|a|c|e]4}} <LBB0_1>:
   ; Then 16 bytes
   %1 = call i32 asm "
       .inline_2:
@@ -47,7 +47,7 @@ entry:
 ; CHECK: .fstart	[[INLINE2:.LBB0_[0-9]]], .PPGtmp{{[0-9]}}-[[INLINE2]], 32
 ; CHECK-LABEL: .inline_2:
 
-; ALIGN: {{[0-9]*[0|2|4|6|8|a|c|e]4}} <.inline_2>:
+; ALIGN: {{[0-9]*[0|2|4|6|8|a|c|e]4}} <LBB0_2>:
   ; Then another 36 bytes
   %2 = call i32 asm "
       .inline_3:
@@ -67,7 +67,7 @@ entry:
 ; CHECK: .fstart	[[INLINE3:.LBB0_[0-9]]], .PPGtmp{{[0-9]}}-[[INLINE3]], 32	
 ; CHECK-LABEL: .inline_3:
 
-; ALIGN: {{[0-9]*[0|2|4|6|8|a|c|e]4}} <.inline_3>:
+; ALIGN: {{[0-9]*[0|2|4|6|8|a|c|e]4}} <LBB0_3>:
   %3 = sub i32 %2, 30142
   ret i32 %3 ; =0
 }
