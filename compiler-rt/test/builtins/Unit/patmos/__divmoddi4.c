@@ -1,4 +1,5 @@
 // RUN: %test-patmos-librt
+// RUN: %test-patmos-singlepath-librt
 // END.
 
 // a / b, *rem = a % b

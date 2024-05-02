@@ -111,7 +111,7 @@ void LoopCountInsert::doFunction(MachineFunction &MF){
 		if(!loop_bounds) {
 			report_fatal_error(
 				  "Single-path code generation failed! "
-				  "Loop has no bound. Loop bound expected in the following MBB but was not found: '" +
+				  "Loop has no bound. Function: '" + MF.getName() + "', MBB: '" +
 				  header_mbb.getName() + "'!");
 		}
 		auto upper_bound = loop_bounds->second;
