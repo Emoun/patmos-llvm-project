@@ -5,28 +5,42 @@ runs:
   using: "composite"
   steps: 
     - if: runner.os == 'macOS'
-      name: Install GNU-tar as 'tar'
+      name: Install Dependencies
       shell: bash
       run: |
-        brew install gnu-tar texinfo
+        brew install gnu-tar texinfo lp_solve
         # Set gtar to be available as 'tar'
         echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
+    - if: runner.os == 'Linux'
+      name: Install Dependencies
+      shell: bash
+      run: sudo apt-get install -y liblpsolve55-dev
     - name: Create Installation Directory
       shell: bash
       run: mkdir -p $INSTALL_PATH
     - if: runner.os == 'macOS'
-      name: Download Dependencies (MacOs)
+      name: Download Simulator (MacOs)
       working-directory: ${{env.INSTALL_PATH}}
       shell: bash
       run: |
         wget -O patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-apple-darwin.tar.gz
     - if: runner.os == 'Linux'
-      name: Download Dependencies (Linux)
+      name: Download Simulator (Linux)
       working-directory: ${{env.INSTALL_PATH}}
       shell: bash
       run: |
         wget -O patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
-    - name: Install Dependencies
+    - name: Download & Install Platin
+      env:
+        PLATIN_COMMIT: ee292b9f0480c6a5451a60e4f84665158d751b19
+      shell: bash
+      run: |
+        git clone https://github.com/t-crest/patmos-platin ${{env.PLATIN_PATH}}
+        cd ${{env.PLATIN_PATH}}
+        git checkout $PLATIN_COMMIT
+        chmod u+x install.sh
+        ./install.sh -i $GITHUB_WORKSPACE/$INSTALL_PATH
+    - name: Extract Simulator & Set Path
       working-directory: ${{env.INSTALL_PATH}}
       shell: bash
       run: |

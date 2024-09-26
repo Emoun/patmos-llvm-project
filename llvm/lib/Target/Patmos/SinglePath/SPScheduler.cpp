@@ -287,15 +287,16 @@ bool may_bundle(const MachineInstr *instr1, const MachineInstr *instr2) {
     return (req1(opcode1) && req2(opcode2)) || (req1(opcode2) && req2(opcode1));
   };
 
-  if(PatmosSubtarget::usePermissiveDualIssue() && (
-    is_combination(isLoadInst, isLoadInst) ||
-	is_combination(isStoreInst, isStoreInst) ||
-	is_combination(isLoadInst, isStoreInst) ||
-	is_combination(isStackInst, isStackInst) ||
-	is_combination(sp_scheduler_is_main_mem_instr, sp_scheduler_is_main_mem_instr) ||
-	is_combination(isControlFlowInst, isControlFlowInst) ||
-	is_combination(isMultiplyInst, isMultiplyInst)
-  )) {
+  if( PatmosSubtarget::usePermissiveDualIssue() && (
+      is_combination(isLoadInst, isLoadInst) ||
+      is_combination(isStoreInst, isStoreInst) ||
+      is_combination(isLoadInst, isStoreInst) ||
+      is_combination(isStackInst, isStackInst) ||
+      is_combination(sp_scheduler_is_main_mem_instr, sp_scheduler_is_main_mem_instr) ||
+      is_combination(isControlFlowInst, isControlFlowInst) ||
+      is_combination(isMultiplyInst, isMultiplyInst)
+    )
+  ) {
     return false;
   }
   return true;

@@ -1,10 +1,15 @@
 import os
 import subprocess
 import sys
+import re
 from shutil import which
 
 if which("pasim") is None:
     print("Patmos simulator 'pasim' could not be found.")
+    sys.exit(1)
+    
+if which("platin") is None:
+    print("Patmos WCET analyser 'platin' could not be found.")
     sys.exit(1)
 
 first_exec_arg_index = 9
@@ -49,10 +54,11 @@ exec_arg = sys.argv[first_exec_arg_index]
 
 # It cleans the given pasim statistics
 # leaving only the stats needed to ensure two run of a singlepath
-# program are identical (execution-wise).
+# program are identical (execution-wise) and the worst execution times of all functions called.
 def pasim_stat_clean(stats):
     input = stats.splitlines()
-    output = ""
+    profile_output = ""
+    wcet_output = ""
     currentLine = 0;
     #Find the instruction statistics
     while input[currentLine].strip() != "Instruction Statistics:":
@@ -66,7 +72,7 @@ def pasim_stat_clean(stats):
         split_line = input[currentLine].split()
         name = split_line[0]
         fetch_count = int(split_line[1]) + int(split_line[4])
-        output += name + " " + str(fetch_count)+"\n"
+        profile_output += name + " " + str(fetch_count)+"\n"
         currentLine+=1
     currentLine+=1 # Discard the "all:"
     
@@ -74,7 +80,7 @@ def pasim_stat_clean(stats):
     while not input[currentLine].strip().startswith("Cycles:"):
         currentLine+=1
     split = input[currentLine].split()
-    output += split[0] + " " + split[1] + "\n"
+    profile_output += split[0] + " " + split[1] + "\n"
     currentLine+=1
     
     #Find profiling information
@@ -83,20 +89,24 @@ def pasim_stat_clean(stats):
     #Discard the header and next 3 lines, which are just table headers
     currentLine+=4
             
-    #Output how many times each function is called
+    #Output how many times each function is called and its worst execution time
     while True:
         line = input[currentLine].strip()
         currentLine+=1
         if line.startswith("<"):
             currentLine+=1 #Discard next line
-            count = input[currentLine].strip().split()[0]
+            func_stats_split = input[currentLine].strip().split()
+            count = func_stats_split[0]
+            worst_exec = func_stats_split[2]
             currentLine+=1
-            output += line[1:].split(">")[0] + "(): " + count + "\n"
+            function_name = line[1:].split(">")[0] + "(): "
+            profile_output += function_name + count + "\n"
+            wcet_output += function_name + worst_exec + "\n"
         else:
             #Not part of the profiling
             break;
-    
-    return output
+            
+    return profile_output, wcet_output
     
 # Executes the given program (arg 1), running statistics on the given function (arg 2).
 # Argument 3 is the execution arguments (see top of file for description).
@@ -160,7 +170,16 @@ def compile_and_test(llc_args, pasim_args):
         if with_debug:
             print("Debug file: ", debug_file)
         sys.exit(1)
-        
+           
+    def get_cleaned_stats_cycles(stats):
+        stats_cycles_groups = re.search(sp_root + "\(\): (\d.*)", stats)
+        if stats_cycles_groups is None:
+            throw_error("Execution stats have no cycle count:\n" + stats)
+        elif len(stats_cycles_groups.groups()) == 1:
+            return int(stats_cycles_groups.group(1))
+        else:
+           throw_error("Execution stats have multiple cycle counts:\n" + stats)    
+           
     using_singlepath = "-mpatmos-singlepath=" in llc_args
     using_cet = "-mpatmos-enable-cet" in llc_args
         
@@ -175,6 +194,9 @@ def compile_and_test(llc_args, pasim_args):
     
     # Compile into object file (not ELF yet)
     llc_compile_arg_list =[bin_dir+"/llc", compiled] + llc_args.split() + ["-filetype=obj", "-o", compiled]
+    if not using_singlepath:
+        llc_compile_arg_list = llc_compile_arg_list + ["-mserialize-pml=" + compiled + ".pml", "-mserialize-pml-functions=" + sp_root]
+        
     if with_debug:
         llc_compile_arg_list = llc_compile_arg_list + ["--debug", "--print-after-all"]
         stderr_cfg = open(debug_file, "w", 1)
@@ -183,30 +205,68 @@ def compile_and_test(llc_args, pasim_args):
 
     if subprocess.run(llc_compile_arg_list, stderr=stderr_cfg).returncode != 0:
         throw_error("Failed to compile '", source_to_test, "'")
-     
+    
+    if not using_singlepath:
+        # Get WCET
+        pml_name = compiled + ".pml"
+        platin_arg_list = "platin wcet -i" + pml_name + " -b " + compiled + " -e " + sp_root + " --report --objdump-command " + bin_dir + "/llvm-objdump --verbose --target-call-return-costs"
+        platin_proc = subprocess.run(platin_arg_list.split(), stdout = subprocess.PIPE, stderr = subprocess.PIPE, universal_newlines = True)
+        
+        def throw_platin_error(*msgs):
+            for msg in msgs:
+                print(msg, end = '')
+            print(" for function '" + sp_root + "' in '" + compiled + "' :\n-------------------- Platin stdout --------------------\n")
+            print(platin_proc.stdout + "\n")
+            print("--------------------- Platin stderr ---------------------\n")
+            print(platin_proc.stderr + "\n")
+            print("--------------------------------------------------\n")
+            throw_error("")
+        
+        if platin_proc.returncode != 0:
+            throw_platin_error("Failed to get WCET")
+            
+        
+        wcet_groups = re.search("platin(\s.*)cycles: (\d.*)\n", platin_proc.stdout)
+        if wcet_groups is None:
+            throw_platin_error("Failed to find WCET in platin output")
+        elif len(wcet_groups.groups()) == 2:
+            platin_wcet = int(wcet_groups.group(2))
+        else:
+            throw_platin_error("Found multiple WCETs in platin output")
+    
     # Run the first execution argument on its own,
     # such that its stats result can be compared to
     # all other executions
-    first_stats_failed, first_stats=execute_and_stat(compiled, exec_arg, pasim_args)
+    first_stats_failed, (first_stats_profile, first_stats_et) = execute_and_stat(compiled, exec_arg, pasim_args)
     if first_stats_failed:
-        throw_error(first_stats)
-
-      
+        throw_error(first_stats_profile)
+    
+    first_stats_cycles = get_cleaned_stats_cycles(first_stats_et)
+    
+    if not using_singlepath and platin_wcet<first_stats_cycles:
+        throw_platin_error("The execution time of '", compiled, "' for execution arguments '", exec_arg, "' was higher than the WCET: " + str(first_stats_cycles) + " > " + str(platin_wcet) )
+        
+    
     # Run the rest of the execution arguments.
     # For each one, compare to the first. If they all
     # are equal to the first, they must also be equal to each other,
     # so we don't need to compare them to each other.
     for i in sys.argv[first_exec_arg_index:]:
             
-        rest_failed, rest_stats=execute_and_stat(compiled, i, pasim_args)
+        rest_failed, (rest_stats_profile, rest_stats_et)=execute_and_stat(compiled, i, pasim_args)
         if rest_failed:
             throw_error()
         
+        rest_stats_cycles = get_cleaned_stats_cycles(rest_stats_et)
+        
         if using_singlepath:
-            if first_stats != rest_stats:
+            if first_stats_profile != rest_stats_profile:
                 import difflib
-                sys.stderr.writelines(difflib.context_diff(first_stats.split("\n"), rest_stats.split("\n")))
+                sys.stderr.writelines(difflib.context_diff(first_stats_profile.split("\n"), rest_stats_profile.split("\n")))
                 throw_error("The execution of '", compiled, "' for execution arguments '", exec_arg, "' and '", i, "' weren't equivalent")
+        elif platin_wcet<get_cleaned_stats_cycles(rest_stats_et):
+            throw_platin_error("The execution time of '", compiled, "' for execution arguments '", i, "' was higher than the WCET: " + str(rest_stats_cycles) + " > " + str(platin_wcet) )
+            
 
 # Compile and test all compinations in the given matrix
 # The matrix is a list of either string pairs or nested matrices.
@@ -249,15 +309,8 @@ compile_and_test_matrix("", "", [
     # (without needing to make tests with big functions)
     "-O2 --mpatmos-max-subfunction-size=64", 
     [
-        # We add this indirection so that commenting out the following line will remove all traditional tests
-        "",
-        [
-            #Traditional
-            "",
-            # Traditional code with PML output, just to make sure we can
-            # output it without errors. Testing the output is not done.
-            "-mserialize-pml=" + compiled + ".pml -mserialize-pml-functions=" + sp_root
-        ]
+        # Traditional
+        ""
     ],
     [
         # Single-Path
