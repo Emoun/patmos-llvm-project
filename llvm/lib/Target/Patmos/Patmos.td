@@ -59,6 +59,7 @@ def FeatureMethodCache : SubtargetFeature<"methodcache", "HasMethodCache", "true
 // Patmos supported processors.
 //===----------------------------------------------------------------------===//
 def : ProcessorModel<"generic", PatmosGenericModel, [FeatureMethodCache]>;
+def : ProcessorModel<"patmos", PatmosGenericModel, [FeatureMethodCache]>;
 
 //===----------------------------------------------------------------------===//
 // Target Declaration

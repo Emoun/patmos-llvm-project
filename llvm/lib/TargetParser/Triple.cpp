@@ -1624,6 +1624,7 @@ unsigned Triple::getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   case llvm::Triple::mips:
   case llvm::Triple::mipsel:
   case llvm::Triple::nvptx:
+  case llvm::Triple::patmos:
   case llvm::Triple::ppc:
   case llvm::Triple::ppcle:
   case llvm::Triple::r600:
