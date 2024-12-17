@@ -28,6 +28,8 @@ public:
                      const uint8_t *loc) const override;
   void relocate(uint8_t *loc, const Relocation &rel,
                 uint64_t val) const override;
+
+  int64_t getImplicitAddend(const uint8_t *buf, RelType type) const override;
 };
 
 }
@@ -180,6 +182,25 @@ void Patmos::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   }
   default:
     llvm_unreachable("unknown relocation");
+  }
+}
+
+int64_t Patmos::getImplicitAddend(const uint8_t *buf, RelType type) const {
+  switch (type) {
+  default:
+    internalLinkerError(getErrorLocation(buf),
+                        "cannot read addend for relocation " + toString(type));
+    return 0;
+  case R_PATMOS_CFLI_ABS:
+  case R_PATMOS_ALUI_ABS:
+  case R_PATMOS_ALUL_ABS:
+  case R_PATMOS_MEMB_ABS:
+  case R_PATMOS_MEMH_ABS:
+  case R_PATMOS_MEMW_ABS:
+  case R_PATMOS_ABS_32:
+  case R_PATMOS_CFLI_PCREL:
+    // These relocations are defined as not having an implicit addend.
+    return 0;
   }
 }
 
