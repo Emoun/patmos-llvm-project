@@ -1447,11 +1447,12 @@ template <class ELFT> Triple::ArchType ELFObjectFile<ELFT>::getArch() const {
       return Triple::loongarch32;
     case ELF::ELFCLASS64:
       return Triple::loongarch64;
-    case ELF::EM_PATMOS:
-      return Triple::patmos;
     default:
       report_fatal_error("Invalid ELFCLASS!");
     }
+
+  case ELF::EM_PATMOS:
+    return Triple::patmos;
 
   case ELF::EM_XTENSA:
     return Triple::xtensa;
