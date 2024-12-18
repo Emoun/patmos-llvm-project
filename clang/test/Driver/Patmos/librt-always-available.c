@@ -14,7 +14,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // CHECK-DAG: <main>:
-void main() { 
+int main() { 
 	asm volatile (
 		// CHECK: li $r1 = 
 		"li $r1 = patmos_mock_librt_function;"
@@ -23,5 +23,6 @@ void main() {
 		:
 		: "r1"
 	);
+	return 0;
 }
 // CHECK-DAG: <patmos_mock_librt_function>:

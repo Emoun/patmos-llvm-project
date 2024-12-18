@@ -361,10 +361,6 @@ bool patmos::PatmosBaseTool::ConstructOptJob(const Tool &Creator,
   // pass -O level to opt verbatim
   OptArg->renderAsInput(Args, OptArgs);
 
-  // for some reason, we need to add this manually
-  OptArgs.push_back("--internalize");
-  OptArgs.push_back("--globaldce");
-
   if (OptLevel == 3) {
     OptArgs.push_back("--std-link-opts");
   }
