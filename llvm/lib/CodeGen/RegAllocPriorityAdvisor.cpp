@@ -56,8 +56,10 @@ private:
   }
   std::unique_ptr<RegAllocPriorityAdvisor>
   getAdvisor(const MachineFunction &MF, const RAGreedy &RA) override {
+	// We call RA.getAnalysis to make sure the RA and this have the same SlotIndex analysis.
     return std::make_unique<DefaultPriorityAdvisor>(
-        MF, RA, &getAnalysis<SlotIndexesWrapperPass>().getSI());
+		MF, RA, &RA.getAnalysis<SlotIndexesWrapperPass>().getSI());
+//    	MF, RA, &getAnalysis<SlotIndexesWrapperPass>().getSI());
   }
   bool doInitialization(Module &M) override {
     if (NotAsRequested)
