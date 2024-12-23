@@ -151,7 +151,6 @@ static bool eliminate_mem_intrinsic(Function &F, IntrinsicInst *II, StringRef na
   auto arg2 = II->getArgOperand(2);
 
   assert(cast<PointerType>(arg0->getType())->getAddressSpace() == 0);
-  assert(arg0->getType()->getContainedType(0)->isIntegerTy(8));
   assert(arg2->getType()->isIntegerTy(32) || arg2->getType()->isIntegerTy(64));
 
   if(auto* memcpy_len = dyn_cast<ConstantInt>(arg2)) {
@@ -184,7 +183,6 @@ static bool eliminateIntrinsic(Function &F, BasicBlock &BB) {
           auto arg1 = II->getArgOperand(1);
 
           assert(cast<PointerType>(arg1->getType())->getAddressSpace() == 0);
-          assert(arg1->getType()->getContainedType(0)->isIntegerTy(8));
 
           if(eliminate_mem_intrinsic(F, II, "llvm.memcpy",
             [&](auto *arg0, auto *arg2, auto len){
