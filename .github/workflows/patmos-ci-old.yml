@@ -72,7 +72,6 @@ jobs:
           - platform: macos-14 # ARM
             cc: clang
             cxx: clang++
-          
     env:
       CC: ${{matrix.cc}}
       CXX: ${{matrix.cxx}}
